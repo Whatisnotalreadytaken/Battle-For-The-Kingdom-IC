@@ -4,14 +4,16 @@ using System.Xml.Serialization;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-[RequireComponent(typeof(Rigidbody2D))]
+[RequireComponent(typeof(Rigidbody2D), typeof(TouchingDirection))]
 public class PlayerController : MonoBehaviour
 {
     public float walkSpeed = 5f;
     public float slideSpeed = 8.5f;
+    public float airWalkSpeed = 6.75f;
+    public float jumpImpulse = 10.5f;
     Animator animator;
     Vector2 moveInput;
-
+    TouchingDirection touchingDirections;
 
     [SerializeField]
     private bool _isMoving = false;
@@ -31,26 +33,53 @@ public class PlayerController : MonoBehaviour
             _isFacingRight = value;
         }
     }
-        
-    public float CurrentMoveSpeed{ get
-        {
-            if (IsMoving)
-            {
 
-                if (IsSliding)
+    public bool CanMove
+    {
+        get
+        {
+            return animator.GetBool(AnimationStrings.canMove);
+        }
+    }
+
+
+    public float CurrentMoveSpeed
+    {
+        get
+        {
+            if(CanMove)
+            {
+                if (IsMoving && !touchingDirections.IsOnWall)
                 {
-                    return slideSpeed;
+                    if (touchingDirections.IsGrounded)
+                    {
+                        if (IsSliding)
+                        {
+                            return slideSpeed;
+                        }
+                        else
+                        {
+                            return walkSpeed;
+                        }
+                    }
+                    else
+                    {
+                        return airWalkSpeed;
+                    }
                 }
                 else
                 {
-                    return walkSpeed;
-                } 
-            }else
+                    return 0;
+                }
+            }
+            else
             {
                 return 0;
             }
+            
         }
     }
+    
     public bool IsMoving
     {
         get
@@ -60,7 +89,7 @@ public class PlayerController : MonoBehaviour
         private set
         {
             _isMoving = value;
-            animator.SetBool("IsMoving", value);
+            animator.SetBool(AnimationStrings.IsMoving, value);
         }
     }
 
@@ -76,7 +105,7 @@ public class PlayerController : MonoBehaviour
     set
         {
             _isSliding = value;
-            animator.SetBool("IsSliding", value);
+            animator.SetBool(AnimationStrings.IsSliding, value);
         }
     }
 
@@ -86,6 +115,7 @@ public class PlayerController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
+        touchingDirections = GetComponent<TouchingDirection>();
     }
 
     void Start()
@@ -101,6 +131,8 @@ public class PlayerController : MonoBehaviour
     private void FixedUpdate()
     {
         rb.velocity = new Vector2(moveInput.x * CurrentMoveSpeed, rb.velocity.y);
+
+        animator.SetFloat(AnimationStrings.vVelocity, rb.velocity.y);
     }
 
     public void OnMove(InputAction.CallbackContext context)
@@ -133,6 +165,22 @@ public class PlayerController : MonoBehaviour
         else if (context.canceled)
         {
             IsSliding = false;
+        }
+    }
+    public void OnJump(InputAction.CallbackContext context)
+    {
+        if(context.started && touchingDirections.IsGrounded && CanMove) 
+        {
+            animator.SetTrigger(AnimationStrings.jumpTrigger);
+            rb.velocity = new Vector2(rb.velocity.x, jumpImpulse);
+        }
+    }
+
+    public void OnAttack(InputAction.CallbackContext context)
+    {
+        if(context.started)
+        {
+            animator.SetTrigger(AnimationStrings.attackTrigger);
         }
     }
 }
